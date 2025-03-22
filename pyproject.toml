@@ -16,6 +16,11 @@ dependencies = [
     "openai==1.68.2"
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff"
+]
+
 [project.urls]
 Repository = "https://github.com/OpenWorkspace-o1/ow-camel-faiss-storage"
 Documentation = "https://github.com/OpenWorkspace-o1/ow-camel-faiss-storage/blob/main/README.md"

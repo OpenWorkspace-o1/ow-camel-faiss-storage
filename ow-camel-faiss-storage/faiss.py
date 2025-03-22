@@ -61,11 +61,46 @@ class FaissVectorStorage(BaseVectorStorage):
             # Create a new FAISS index
             self.faiss_index = FAISS.from_texts([], embedding=embedding, metadatas=self.metadatas)
 
-    def add(self, records: List[VectorRecord]) -> None:
+    def _validate_and_convert_vectors(
+        self, records: List[VectorRecord]
+    ) -> Tuple[List[List[float]], List[str], List[dict]]:
+        r"""Validates and converts VectorRecord instances to the format
+        expected by Milvus.
+
+        Args:
+            records (List[VectorRecord]): List of vector records to validate
+            and convert.
+
+        Returns:
+            Tuple[List[List[float]], List[str], List[dict]]: A tuple of validated vectors, ids, and metadatas.
         """
-        Add a list of vector records to the FAISS index.
+        validated_vectors = []
+        validated_ids = []
+        validated_metadatas = []
+
+        for record in records:
+            validated_vectors.append(record.vector)
+            validated_ids.append(record.id)
+            validated_metadatas.append(record.payload)
+
+        return validated_vectors, validated_ids, validated_metadatas
+
+    def add(self, records: List[VectorRecord], **kwargs: Any) -> None:
+        r"""Adds a list of vectors to the specified collection.
+
+        Args:
+            records (List[VectorRecord]): List of vectors to be added.
+            **kwargs (Any): Additional keyword arguments pass to insert.
+
+        Raises:
+            RuntimeError: If there was an error in the addition process.
         """
-        self.faiss_index.add_texts([record.text for record in records])
+        validated_vectors, validated_ids, validated_metadatas = self._validate_and_convert_vectors(records)
+        self.faiss_index.add_embeddings(
+            text_embeddings=validated_vectors,
+            ids=validated_ids,
+            metadatas=validated_metadatas
+        )
 
     def query(self, query: str, top_k: int = 10) -> List[VectorRecord]:
         """

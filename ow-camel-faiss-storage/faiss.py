@@ -14,13 +14,10 @@
 
 import logging
 import os
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Tuple
 
 from camel.storages.vectordb_storages import (
     BaseVectorStorage,
-    VectorDBQuery,
-    VectorDBQueryResult,
     VectorDBStatus,
     VectorRecord,
 )
@@ -46,13 +43,13 @@ class FaissVectorStorage(BaseVectorStorage):
                  collection_name: str,
                  embedding_model: str,
                  embedding_dim: int,
-                 metadatas: List[dict] | None = None
+                 collection_metadatas: List[dict] | None = None
             ):
         super().__init__(collection_name)
         self.collection_name = collection_name
         self.embedding_model = embedding_model
         self.embedding_dim = embedding_dim
-        self.metadatas = metadatas
+        self.collection_metadatas = collection_metadatas
 
         # Initialize vector store
         embedding = OpenAIEmbeddings(model=self.embedding_model, dimensions=self.embedding_dim)
@@ -68,7 +65,7 @@ class FaissVectorStorage(BaseVectorStorage):
         else:
             logger.info(f"Creating new FAISS index in {index_name}.")
             # Create a new FAISS index
-            self.faiss_index = FAISS.from_texts([], embedding=embedding, metadatas=self.metadatas)
+            self.faiss_index = FAISS.from_texts([], embedding=embedding, metadatas=self.collection_metadatas)
 
     def _validate_and_convert_vectors(
         self, records: List[VectorRecord]

@@ -27,6 +27,7 @@ from camel.storages.vectordb_storages import (
 from camel.utils import dependencies_required
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
+from langchain.embeddings.base import Embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,12 @@ logger = logging.getLogger(__name__)
 @dependencies_required(["faiss-cpu", "langchain_community"])
 class FaissVectorStorage(BaseVectorStorage):
     """
+    A vector storage implementation using FAISS.
+    Args:
+        collection_name (str): The name of the collection to store the vectors in.
+        embedding_model (str): The name of the embedding model to use.
+        embedding_dim (int): The dimension of the embedding vectors.
+        metadatas (List[dict], optional): A list of dictionaries containing metadata for each vector.
     """
     def __init__(self,
                  collection_name: str,
@@ -49,15 +56,17 @@ class FaissVectorStorage(BaseVectorStorage):
 
         # Initialize vector store
         embedding = OpenAIEmbeddings(model=self.embedding_model, dimensions=self.embedding_dim)
-        FAISS_INDEX_NAME = os.path.join("ow-o1-vecs", f"faiss_index_{self.collection_name}")
+        self.FAISS_INDEX_NAME = os.path.join("ow-o1-vecs", f"faiss_index_{self.collection_name}")
 
-        # Check if the index already exists
-        if os.path.exists(FAISS_INDEX_NAME):
-            logger.info(f"Loading existing FAISS index from {FAISS_INDEX_NAME}.")
+        self._check_and_create_index(embedding, self.FAISS_INDEX_NAME)
+
+    def _check_and_create_index(self, embedding: Embeddings, index_name: str) -> None:
+        if os.path.exists(index_name):
+            logger.info(f"Loading existing FAISS index from {index_name}.")
             # Load the existing FAISS index
-            self.faiss_index = FAISS.load_local(FAISS_INDEX_NAME, embedding, allow_dangerous_deserialization=True)
+            self.faiss_index = FAISS.load_local(index_name, embedding, allow_dangerous_deserialization=True)
         else:
-            logger.info(f"Creating new FAISS index in {FAISS_INDEX_NAME}.")
+            logger.info(f"Creating new FAISS index in {index_name}.")
             # Create a new FAISS index
             self.faiss_index = FAISS.from_texts([], embedding=embedding, metadatas=self.metadatas)
 
@@ -101,6 +110,7 @@ class FaissVectorStorage(BaseVectorStorage):
             ids=validated_ids,
             metadatas=validated_metadatas
         )
+        self.faiss_index.save_local(self.FAISS_INDEX_NAME)
 
     def query(self, query: str, top_k: int = 10) -> List[VectorRecord]:
         """

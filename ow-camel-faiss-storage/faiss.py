@@ -18,13 +18,15 @@ from typing import Any, List, Tuple
 
 from camel.storages.vectordb_storages import (
     BaseVectorStorage,
+    VectorDBQueryResult,
     VectorDBStatus,
     VectorRecord,
 )
 from camel.utils import dependencies_required
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain.embeddings.base import Embeddings
+from langchain_core.embeddings import Embeddings
+from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +63,11 @@ class FaissVectorStorage(BaseVectorStorage):
         if os.path.exists(index_name):
             logger.info(f"Loading existing FAISS index from {index_name}.")
             # Load the existing FAISS index
-            self.faiss_index = FAISS.load_local(index_name, embedding, allow_dangerous_deserialization=True)
+            self.faiss_index = FAISS.load_local(index_name, embeddings=embedding, allow_dangerous_deserialization=True)
         else:
             logger.info(f"Creating new FAISS index in {index_name}.")
             # Create a new FAISS index
-            self.faiss_index = FAISS.from_texts([], embedding=embedding, metadatas=self.collection_metadatas)
+            self.faiss_index = FAISS.from_texts([index_name], embedding=embedding, metadatas=self.collection_metadatas)
 
     def _validate_and_convert_vectors(
         self, records: List[VectorRecord]
@@ -109,11 +111,16 @@ class FaissVectorStorage(BaseVectorStorage):
         )
         self.faiss_index.save_local(self.FAISS_INDEX_NAME)
 
+    def _convert_documents_to_vector_records(self, documents: List[Tuple[Document, float]]) -> List[VectorRecord]:
+        # todo vectorize the page content
+        return [VectorDBQueryResult.create(vector=document.page_content, id=document.id, payload=document.metadata) for document in documents]
+
     def query(self, query: str, top_k: int = 10) -> List[VectorRecord]:
         """
         Query the FAISS index for the top k most similar vectors to the query.
         """
-        return self.faiss_index.similarity_search_with_score(query, k=top_k)
+        search_results: List[Tuple[Document, float]] = self.faiss_index.similarity_search_with_score(query, k=top_k)
+        return self._convert_documents_to_vector_records(search_results)
 
     def delete(self, ids: List[str]) -> None:
         """
